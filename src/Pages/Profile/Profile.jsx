@@ -87,7 +87,7 @@ const progressUpdate = async (e) => {
 
 
 
-=======
+
 
 	
   // /////////////////////////////////////////////////////////// //
@@ -133,7 +133,7 @@ const progressUpdate = async (e) => {
 
     
    
-=======
+
 
 
   };
@@ -152,7 +152,7 @@ const progressUpdate = async (e) => {
 
 
 
-=======
+
 
 
 
@@ -195,7 +195,7 @@ const progressUpdate = async (e) => {
 
 
         <button onClick={progressUpdate}>TEST</button>
-=======
+
 
         {/* the progress bar btn plus */}
         <button
