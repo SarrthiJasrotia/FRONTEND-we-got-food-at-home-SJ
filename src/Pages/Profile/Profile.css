@@ -14,6 +14,8 @@
   color: #eb4335;
 }
 
+
+
 .profile-bar-div.bottom {
   color: #e9c650;
 }
@@ -86,7 +88,7 @@ progress {
 
   margin: auto;
   margin-top: 50px;
-  margin-bottom: 50px;
+  margin-bottom: 20px;
 }
 
 .pfpdiv {

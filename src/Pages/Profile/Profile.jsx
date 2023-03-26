@@ -176,10 +176,13 @@ const progressUpdate = async (e) => {
             <div>
               <progress value={progressBarNumber} max="60"></progress>
             </div>
-          </div>
+          
+          </div>  
         </div>
       </div>
-
+    <p className="profile-day-count">
+            You cooked {currentLevel}/7 days this week
+          </p>
  
       <div className="profile-bottom">
         {" "}
