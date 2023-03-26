@@ -53,7 +53,7 @@ function Profile() {
    
    
   // updates or adds the progress bar number in the database when chnanged
-  // useEffect(() => {
+  useEffect(() => {
     
 const progressUpdate = async (e) => {
    
@@ -78,10 +78,10 @@ const progressUpdate = async (e) => {
     };
 
   };
-		// progressUpdate()
-  //   console.log(progress)
+		progressUpdate()
+    console.log(progress)
 		
-	// });
+	});
 // console.log("data",progress);
 
 
@@ -194,7 +194,7 @@ const progressUpdate = async (e) => {
         </div>
 
 
-        <button onClick={progressUpdate}>TEST</button>
+        {/* <button onClick={progressUpdate}>TEST</button> */}
 
 
         {/* the progress bar btn plus */}
