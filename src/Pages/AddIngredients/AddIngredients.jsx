@@ -103,9 +103,9 @@ function AddIngredients() {
 		e.preventDefault();
 		setLoad(true);
 		const gptData = await // Send a request to the server with the prompt
-		axios.post('http://localhost:8080/chat', { prompt });
+		axios.post('https://we-got-food-at-home.herokuapp.com/chat', { prompt });
 		try {
-			const res = await axios.post('http://localhost:8080/chat', { prompt });
+			const res = await axios.post('https://we-got-food-at-home.herokuapp.com/chat', { prompt });
 			setLoad(false);
 			setRecipe(true);
 			console.log(res.data);
