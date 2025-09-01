@@ -162,7 +162,7 @@ const progressUpdate = async (e) => {
         <img src={user.photoURL} className="pfpdiv" />
 
         <div className="leftcontainer">
-          <div className="displayname">{`Chef ${user.displayName}`}</div>
+          <div className="displayname">{`Chef : ${user.displayName}`}</div>
 
           <div className="profile-bar-div top">
             <GiForkKnifeSpoon

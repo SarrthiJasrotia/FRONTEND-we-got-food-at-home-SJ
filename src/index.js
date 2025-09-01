@@ -3,24 +3,53 @@ import ReactDOM from "react-dom/client";
 import "./index.css";
 // import App from "./App";
 import reportWebVitals from "./reportWebVitals";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate} from "react-router-dom";
 import AddIngredients from "./Pages/AddIngredients/AddIngredients";
 import Home from "./Pages/Home/Home";
 // import SeeRecipes from "./Pages/Recipes/SeeRecipes";
 import SignIn from "./Pages/SignIn/SignIn";
 import Profile from "./Pages/Profile/Profile";
 import Layout from "./Pages/Layout";
+import PrivateRoute from "./PrivateRoute";
+
 
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Layout />}>
-          <Route index element={ <SignIn />} />
-          <Route path="home" element={<Home />} />
-          <Route path="ingredients" element={<AddIngredients />} />
-          {/* <Route path="ingredients/recipes" element={<SeeRecipes />} /> */}
-          <Route path="profile" element={<Profile />} />
+          {/* Public routes */}
+          <Route index element={<SignIn />} />
+          <Route path="login" element={<SignIn />} />
+
+          {/* Private routes */}
+          <Route
+            path="home"
+            element={
+              <PrivateRoute>
+                <Home />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="ingredients"
+            element={
+              <PrivateRoute>
+                <AddIngredients />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="profile"
+            element={
+              <PrivateRoute>
+                <Profile />
+              </PrivateRoute>
+            }
+          />
+
+          {/* Fallback */}
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
     </BrowserRouter>
