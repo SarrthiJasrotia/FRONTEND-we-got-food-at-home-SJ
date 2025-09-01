@@ -17,7 +17,12 @@ import {
   addDoc,
   deleteDoc,
   where,
+  setDoc,
+  serverTimestamp,
+  increment,
 } from "firebase/firestore";
+
+const API_BASE = process.env.REACT_APP_API_BASE_URL || "http://localhost:5000";
 
 function AddIngredients() {
   const [user, loading] = useAuthState(auth);
@@ -39,15 +44,26 @@ function AddIngredients() {
     setUId(user?.uid || "");
   }, [user, loading]);
 
-  // add item for this user
+  // add item for this user (dedupe by normalized text)
   const addItem = async (e) => {
     e.preventDefault();
     const text = input.trim();
     if (!uId || !text) return;
+
+    const normalized = text.toLowerCase();
+    const exists = items.some(
+      (it) => (it.text || "").trim().toLowerCase() === normalized
+    );
+    if (exists) {
+      alert("Item already exists.");
+      return;
+    }
+
     await addDoc(collection(db, "items"), {
       user: uId,
       text,
       selected: false,
+      createdAt: serverTimestamp(),
     });
     setInput("");
   };
@@ -99,7 +115,7 @@ function AddIngredients() {
     setResponse("");
 
     try {
-      const res = await axios.post("http://localhost:5000/chat", { prompt });
+      const res = await axios.post(`${API_BASE}/chat`, { prompt });
       const data = res?.data;
       const asText =
         typeof data === "string" ? data : JSON.stringify(data, null, 2);
@@ -112,6 +128,21 @@ function AddIngredients() {
     } finally {
       setLoad(false);
     }
+  };
+
+  // mark cooked → increment weekly progress
+  const markCooked = async () => {
+    if (!uId) return;
+    const ref = doc(db, "progressBar", uId);
+    await setDoc(
+      ref,
+      {
+        progressBarNumber: increment(10),
+        currentLevel: increment(1),
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true }
+    );
   };
 
   return (
@@ -167,7 +198,11 @@ function AddIngredients() {
 
           <div>
             <form onSubmit={handleSubmit}>
-              <button className="home-logout-button" type="submit" disabled={load}>
+              <button
+                className="home-logout-button"
+                type="submit"
+                disabled={load || selectedItems.length === 0}
+              >
                 {load ? "Cooking up ideas…" : "Create a recipe"}
               </button>
             </form>
@@ -196,7 +231,9 @@ function AddIngredients() {
             </div>
 
             <Link to="/home">
-              <button className="recipe-button">I Cooked this Recipe!</button>
+              <button className="recipe-button" onClick={markCooked}>
+                I Cooked this Recipe!
+              </button>
             </Link>
 
             <button className="recipe-button" onClick={handleNewPrompt}>
