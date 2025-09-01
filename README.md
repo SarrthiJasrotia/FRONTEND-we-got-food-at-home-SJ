@@ -1,6 +1,4 @@
-# We Got Food at Home
 
-## 2023 Spring Hackathon hosted by General Assembly
 
 Generate recipes from ingredients you already have using AI. 
 
