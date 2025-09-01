@@ -1,8 +1,7 @@
-// Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-import firebase from "firebase/compat/app";
-import "firebase/compat/auth";
+// src/services/firebase.js
 
+// firebase init
+import { initializeApp } from "firebase/app";
 import {
   GoogleAuthProvider,
   getAuth,
@@ -18,11 +17,7 @@ import {
   addDoc,
 } from "firebase/firestore";
 
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
-
-// Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+// env config
 const firebaseConfig = {
   apiKey: process.env.REACT_APP_FB_API_KEY,
   authDomain: process.env.REACT_APP_AUTHDOMAIN,
@@ -30,46 +25,38 @@ const firebaseConfig = {
   storageBucket: process.env.REACT_APP_STORAGE_BUCKET,
   messagingSenderId: process.env.REACT_APP_MESSAGING_SENDER_ID,
   appId: process.env.REACT_APP_APP_ID,
-  measurementId: process.env.REACT_APP_MEASUREMENT_ID,
+  measurementId: process.env.REACT_APP_MEASUREMENT_ID, // ok if undefined
 };
 
-// Initialize Firebase
+// single app instance
 const app = initializeApp(firebaseConfig);
+
+// sdk handles persistence (local) by default
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-//SignIn with popup
-
+// auth helpers
 const googleProvider = new GoogleAuthProvider();
-const signInWithGoogle = async () => {
-  try {
-    const res = await signInWithPopup(auth, googleProvider);
-    const user = res.user;
-    const q = query(collection(db, "users"), where("uid", "==", user.uid));
-    const docs = await getDocs(q);
-    if (docs.docs.length === 0) {
-      await addDoc(collection(db, "users"), {
-        uid: user.uid,
-        name: user.displayName,
-        authProvider: "google",
-        email: user.email,
-      });
-    }
-  } catch (err) {
-    console.error(err);
-    alert(err.message);
+
+async function signInWithGoogle() {
+  const res = await signInWithPopup(auth, googleProvider);
+  const user = res.user;
+
+  // upsert basic user doc
+  const q = query(collection(db, "users"), where("uid", "==", user.uid));
+  const docs = await getDocs(q);
+  if (docs.empty) {
+    await addDoc(collection(db, "users"), {
+      uid: user.uid,
+      name: user.displayName || "",
+      authProvider: "google",
+      email: user.email || "",
+    });
   }
-};
+}
 
-//logout function
-const logout = () => {
-  signOut(auth);
-};
+async function logout() {
+  await signOut(auth);
+}
 
-
-export {
-  auth,
-  db,
-  signInWithGoogle,
-  logout,
-};
+export { auth, db, signInWithGoogle, logout };

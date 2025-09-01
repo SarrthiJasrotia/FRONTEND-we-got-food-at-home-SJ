@@ -1,168 +1,135 @@
+// src/Pages/Profile/Profile.jsx
 import { GiForkKnifeSpoon } from "react-icons/gi";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import "./Profile.css";
 import bronze from "../../images/bronze.png";
 import silver from "../../images/silver.png";
 import gold from "../../images/gold.png";
+
 import { useAuthState } from "react-firebase-hooks/auth";
-import { useEffect } from "react";
-import { logout, auth, db } from "../../services/firebase";
+import { auth, db } from "../../services/firebase";
 
 import {
-  query,
-  collection,
-  onSnapshot,
   doc,
-  addDoc,
+  getDoc,
   setDoc,
-  deleteDoc,
-  where,
+  onSnapshot,
   updateDoc,
   serverTimestamp,
-  getDoc,
 } from "firebase/firestore";
-import { async } from "@firebase/util";
-import e from "cors";
 
 function Profile() {
-  
-  const [currentLevel, setCurrentLevel] = useState(1);
-  const [progress, setProgress] = useState(0);
-  const [user, loading, error] = useAuthState(auth);
-  const [displayName, setDisplayName] = useState("");
-  const [photoURL, setPhotoURL] = useState("");
-  const [progressBarNumber, setProgressBarNumber] = useState()
-  const [uId, setUId] = useState("");
+  // auth hook — PrivateRoute already guards this page, but we still read user here
+  const [user] = useAuthState(auth);
 
+  // local UI state (fed by Firestore snapshot)
+  const [currentLevel, setCurrentLevel] = useState(0);        // 0..7
+  const [progressBarNumber, setProgressBarNumber] = useState(0); // 0..70 (10 per day)
 
+  // constants for clamping — tweak here if you change the weekly target
+  const STEP = 10;              // each day adds 10
+  const MAX_LEVEL = 7;          // 7 days in a week
+  const MIN_LEVEL = 0;
+  const MAX_PROGRESS = 70;      // 7 * 10; if you prefer 6 days, set 60 instead
 
-  // custom Id for when DOC is created so it can called using it
-  const docId = "doc" + user.uid + "Food@Home"
+  // stable doc ref for this user’s progress
+  const progressRef = useMemo(() => {
+    if (!user?.uid) return null;
+    return doc(db, "progressBar", user.uid); // <-- simple, stable path per user
+  }, [user?.uid]);
 
-   // pulls the progressBar data from the database when the user loads
-    const docRef = doc(db,"progressBar", docId)
-    
-    const unsubscribe = onSnapshot((docRef),(doc)=>{
-      const docData =doc.data().progressBarNumber
-      setProgressBarNumber (docData)
-      
-    }
-    
-    )
-    
-   
-   
-  // updates or adds the progress bar number in the database when chnanged
+  // live subscription: pulls progress on load and stays in sync
   useEffect(() => {
-    
-const progressUpdate = async (e) => {
-   
+    if (!progressRef) return;
 
-    const docRef = doc(db, 'progressBar', docId);
-    const docSnap = await getDoc(docRef)
-   
+    let unsub = () => {};
+    (async () => {
+      // initialize the doc the first time we see this user
+      const snap = await getDoc(progressRef);
+      if (!snap.exists()) {
+        await setDoc(
+          progressRef,
+          {
+            ownerId: user.uid,
+            progressBarNumber: 0,
+            currentLevel: 0,
+            updatedAt: serverTimestamp(),
+          },
+          { merge: true }
+        );
+      }
 
-    if (docSnap.exists()) {
-      const updatedProgress = { progressBarNumber: progress };
-      await updateDoc(docRef, updatedProgress);
-      
+      // listen for live updates (including our own writes)
+      unsub = onSnapshot(progressRef, (s) => {
+        const data = s.data() || {};
+        const num = Number(data.progressBarNumber ?? 0);
+        const lvl = Number(data.currentLevel ?? Math.round(num / STEP));
+        setProgressBarNumber(isNaN(num) ? 0 : num);
+        setCurrentLevel(Math.max(MIN_LEVEL, Math.min(MAX_LEVEL, isNaN(lvl) ? 0 : lvl)));
+      });
+    })();
 
-    } else {
-      await setDoc(doc(db, "progressBar", docId), {
-        userName: user.displayName,
-        userId: user.uid,
-        progressBarNumber: progressBarNumber
-      })
-      
+    // cleanup so we don’t keep listening after logout/nav
+    return () => unsub();
+  }, [progressRef]);
 
-    };
-
-  };
-		progressUpdate()
-    console.log(progress)
-		
-	});
-// console.log("data",progress);
-
-
-
-
-
-
-	
-  // /////////////////////////////////////////////////////////// //
-  // /////////////////////////////////////////////////////////// //
-  useEffect(() => {
-    if (loading) {
-      // loading screen
-      return;
-    }
-    if (user) {
-
-      setDisplayName(user.displayName);
-      setPhotoURL(user.photoURL);
-      unsubscribe()
-    }
-  }, [user, loading]);
-
+  // friendly mapping for the badge image + status
   const levelImages = [
-    { level: 0, src: `${bronze}`, status: "bronze" },
-    { level: 1, src: `${bronze}`, status: "bronze" },
-    { level: 2, src: `${bronze}`, status: "bronze" },
-    { level: 3, src: `${bronze}`, status: "bronze" },
-    { level: 4, src: `${silver}`, status: "silver" },
-    { level: 5, src: `${silver}`, status: "silver" },
-    { level: 6, src: `${silver}`, status: "silver" },
-    { level: 7, src: `${gold}`, status: "gold" },
+    { level: 0, src: bronze, status: "bronze" },
+    { level: 1, src: bronze, status: "bronze" },
+    { level: 2, src: bronze, status: "bronze" },
+    { level: 3, src: bronze, status: "bronze" },
+    { level: 4, src: silver, status: "silver" },
+    { level: 5, src: silver, status: "silver" },
+    { level: 6, src: silver, status: "silver" },
+    { level: 7, src: gold,   status: "gold"   },
   ];
 
-  const currentImage = levelImages.find(
-    (image) => image.level === currentLevel
-  ).src;
+  const { src: currentImage, status: currentStatus } =
+    levelImages.find((x) => x.level === currentLevel) || levelImages[0];
 
-  const currentStatus = levelImages.find(
-    (status) => status.level === currentLevel
-  ).status;
+  // increment helpers — write back to the same Firestore doc
+  async function levelUp() {
+    if (!progressRef) return; // not signed in (shouldn’t happen due to guard)
+    const nextLevel = Math.min(currentLevel + 1, MAX_LEVEL);
+    const nextProgress = Math.min(progressBarNumber + STEP, MAX_PROGRESS);
 
-  // level up progress bar
-  const handleLevelUp = async (e) => {
-    
-    setCurrentLevel(currentLevel + 1);
+    // write both so we can display quickly on next login
+    await setDoc(
+      progressRef,
+      {
+        currentLevel: nextLevel,
+        progressBarNumber: nextProgress,
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true }
+    );
+  }
 
-    setProgress(progressBarNumber + 10);
+  async function levelDown() {
+    if (!progressRef) return;
+    const nextLevel = Math.max(currentLevel - 1, MIN_LEVEL);
+    const nextProgress = Math.max(progressBarNumber - STEP, 0);
 
-    
-   
-
-
-
-  };
-
-  // level down progress bar
-  const handleLevelDown = async (e) => {
-    setCurrentLevel(currentLevel - 1);
-    setProgress(progressBarNumber - 10);
-    
-
-
-
-  };
-
-
-
-
-
-
-
-
+    await setDoc(
+      progressRef,
+      {
+        currentLevel: nextLevel,
+        progressBarNumber: nextProgress,
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true }
+    );
+  }
 
   return (
     <div className="wrapper">
       <div className="profile-top">
-        <img src={user.photoURL} className="pfpdiv" />
+        {/* mild guards — user should exist, but don’t explode if photo/displayName are missing */}
+        <img src={user?.photoURL || ""} alt="pfp" className="pfpdiv" />
 
         <div className="leftcontainer">
-          <div className="displayname">{`Chef : ${user.displayName}`}</div>
+          <div className="displayname">{`Chef : ${user?.displayName || "You"}`}</div>
 
           <div className="profile-bar-div top">
             <GiForkKnifeSpoon
@@ -172,47 +139,42 @@ const progressUpdate = async (e) => {
                 color: "#f09133",
                 fontSize: "25px",
               }}
-            />{" "}
+            />
             <div>
-              <progress value={progressBarNumber} max="60"></progress>
+              {/* heads-up: max is 70 to match 7 days * 10 step */}
+              <progress value={progressBarNumber} max="70"></progress>
             </div>
-          
-          </div>  
+          </div>
         </div>
       </div>
-    <p className="profile-day-count">
-            You cooked {currentLevel}/7 days this week
-          </p>
- 
+
+      <p className="profile-day-count">
+        You cooked {currentLevel}/{MAX_LEVEL} days this week
+      </p>
+
       <div className="profile-bottom">
-        {" "}
         <h2>Your Achievement</h2>
+
         <div className="achievement-image">
-          {" "}
           <div>
             <img src={currentImage} alt={`Level ${currentLevel}`} />
-
             <h3>{`You're a ${currentStatus}-level cook!`}</h3>
           </div>
         </div>
 
-
-        {/* <button onClick={progressUpdate}>TEST</button> */}
-
-
-        {/* the progress bar btn plus */}
+        {/* lil UX: clamp buttons so we never overshoot */}
         <button
           className="profile-btn"
-          disabled={currentLevel === 7}
-          onClick={handleLevelUp}
+          disabled={currentLevel >= MAX_LEVEL || progressBarNumber >= MAX_PROGRESS}
+          onClick={levelUp}
         >
           I cooked at home today!
         </button>
-        {/* the progress bar btn minus */}
+
         <button
           className="profile-btn"
-          disabled={currentLevel === 1}
-          onClick={handleLevelDown}
+          disabled={currentLevel <= MIN_LEVEL || progressBarNumber <= 0}
+          onClick={levelDown}
         >
           Oops, no I didn't!
         </button>
@@ -220,4 +182,5 @@ const progressUpdate = async (e) => {
     </div>
   );
 }
+
 export default Profile;
